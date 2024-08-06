@@ -1,0 +1,365 @@
+body {
+    font-family: Arial, sans-serif;
+    font-size: 16px; /* Base para las unidades rem */
+    height: 100%;
+    margin-left: 2rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.container {
+    display: flex;
+    justify-content: space-between;
+    align-items: top;
+    width: 100%;
+    max-width: 90rem;
+    margin: 0 auto;
+    padding: 1.25rem;
+    border: 1px solid #ccc;
+    border-radius: 0.5rem;
+    box-sizing: border-box;
+    position: relative; /* Asegura que el contenedor tenga position: relative */
+    transform-origin: top left; /* Asegura que el punto de referencia de la escala esté en la esquina superior izquierda */
+}
+
+.relative-add-row-btn {
+    position: absolute;
+    top: 135px;
+    left: 18px;
+    width: 50px;
+    height: 50px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    z-index: 1000;
+}
+
+.left-section {
+    width: 65%; /* Ajustamos el ancho del contenedor izquierdo */
+    display: flex;
+    flex-direction: column;
+    margin-right: 1rem; /* Añadimos margen derecho para separar los contenedores */
+}
+
+.header {
+    margin-bottom: 1.25rem; /* 20px equivalente a rem */
+}
+
+.input-section {
+    flex-grow: 1;
+    overflow-y: auto; /* Añadir desplazamiento vertical si el contenido es demasiado alto */
+    max-height: 600px; /* Establece una altura máxima */
+}
+
+.right-section {
+    width: 35%; /* Ajustamos el ancho del contenedor derecho */
+    display: flex;
+    flex-direction: column;
+    position: sticky; /* Mantener el contenedor fijo en su posición */
+    top: 0; /* Asegurar que se mantenga en la parte superior */
+}
+
+.upper-right, .lower-right {
+    flex: 1; /* Ocupan el mismo espacio vertical */
+    display: flex;
+    flex-direction: column;
+}
+
+textarea {
+    width: 100%; /* Hacemos que el textarea ocupe el 100% del ancho disponible */
+    height: 6.25rem; /* 100px equivalente a rem */
+    margin-bottom: 0; /* Eliminamos el margen inferior */
+    padding: 0.625rem; /* 10px equivalente a rem */
+    resize: none;
+    box-sizing: border-box; /* Asegura que el padding se incluya en el tamaño total del elemento */
+}
+
+button {
+    display: block;
+    margin-top: 0.625rem; /* 10px equivalente a rem */
+    padding: 0.625rem; /* 10px equivalente a rem */
+    border: 1px solid #ccc; /* Añadimos un borde delgado */
+    border-radius: 0.25rem; /* 4px equivalente a rem */
+    cursor: pointer;
+    font-size: 0.875rem; /* Reducimos el tamaño de letra de los botones en 2 puntos */
+    box-sizing: border-box; /* Asegura que el padding se incluya en el tamaño total del elemento */
+}
+
+.action-btn {
+    display: inline-block; /* Mostrar los botones de acción en línea */
+    margin-right: 0.625rem; /* 10px equivalente a rem */
+    margin-bottom: 0.625rem; /* 10px equivalente a rem */
+}
+
+.toggle-btn {
+    display: block;
+    width: 100%;
+}
+
+#send-messages-btn {
+    background-image: url('/static/images/send-icon.png'); /* Ruta relativa a la imagen */
+    background-size: cover; /* Aseguramos que la imagen cubra todo el botón */
+    background-position: center; /* Centramos la imagen */
+    background-color: transparent; /* Aseguramos que el fondo sea transparente */
+    width: 5rem; /* 80px equivalente a rem */
+    height: 5rem; /* 80px equivalente a rem */
+    border: none; /* Eliminamos el borde para la imagen */
+    margin-top: 0; /* Eliminamos el margen superior */
+    align-self: flex-end; /* Alineamos el botón a la derecha */
+}
+
+#send-messages-btn:hover {
+    background-size: contain; /* Aseguramos que la imagen se ajuste al tamaño del botón al pasar el mouse */
+}
+
+.pressed {
+    transform: scale(0.95);
+    background-color: #e0e0e0;
+    transition: transform 0.1s, background-color 0.1s;
+}
+
+#select-folder-btn {
+    display: none; /* Ocultamos el input original */
+}
+
+.folder-section {
+    display: flex;
+    align-items: center;
+    margin-top: 1.25rem; /* 20px equivalente a rem */
+}
+
+.folder-icon-btn {
+    background-image: url('/static/images/folder-icon.png'); /* Ruta relativa a la imagen */
+    background-size: cover; /* Aseguramos que la imagen cubra todo el botón */
+    background-position: center; /* Centramos la imagen */
+    background-color: transparent; /* Aseguramos que el fondo sea transparente */
+    width: 3.75rem; /* 60px equivalente a rem */
+    height: 3.75rem; /* 60px equivalente a rem */
+    border: none; /* Eliminamos el borde para la imagen */
+    cursor: pointer;
+    margin-right: 0.625rem; /* 10px equivalente a rem */
+}
+
+.clear-folder-btn {
+    background-image: url('/static/images/folder-erase-icon.png'); /* Ruta relativa a la imagen */
+    background-size: cover; /* Aseguramos que la imagen cubra todo el botón */
+    background-position: center; /* Centramos la imagen */
+    background-color: transparent; /* Aseguramos que el fondo sea transparente */
+    width: 3.375rem; /* 54px equivalente a rem */
+    height: 3.375rem; /* 54px equivalente a rem */
+    border: none; /* Eliminamos el borde para la imagen */
+    cursor: pointer;
+    margin-left: 1rem; /* Aumentamos el margen izquierdo para alejarlo del conteo de archivos adjuntos */
+}
+
+/* Botones de acción en las filas de la tabla */
+.delete-row-btn, .toggle-send-btn {
+    display: inline-block;
+    width: 1rem; /* 30px equivalente a rem */
+    height: 1rem; /* 30px equivalente a rem */
+    border-radius: 50%;
+    cursor: pointer;
+    margin: 0 0.125rem; /* Reducimos el margen horizontal entre botones */
+    background-size: cover; /* Aseguramos que la imagen cubra todo el botón */
+    background-position: center; /* Centramos la imagen */
+}
+
+.delete-row-btn {
+    background-image: url('/static/images/delete-icon.png'); /* Ruta relativa a la imagen */
+}
+
+.toggle-send-btn.white {
+    background-image: url('/static/images/white-icon.png'); /* Ruta relativa a la imagen */
+}
+
+.toggle-send-btn.green {
+    background-image: url('/static/images/green-icon.png'); /* Ruta relativa a la imagen */
+}
+
+/* Ajustes para los recuadros de texto */
+.text-box {
+    position: relative;
+    margin-bottom: 0; /* Eliminamos el margen inferior del contenedor de texto */
+}
+
+.text-box textarea {
+    width: 100%; /* Hacemos que el textarea ocupe el 100% del ancho disponible */
+}
+
+.button-container {
+    display: flex;
+    justify-content: flex-end; /* Alineamos los botones a la derecha */
+    margin-top: -0.3125rem; /* Ajustamos el margen superior negativo para eliminar el espacio */
+    margin-bottom: 1.25rem; /* Añadimos margen inferior para espacio */
+}
+
+.button-container button {
+    width: auto;
+    margin-left: 0.3125rem; /* Reducimos el margen izquierdo para acercar los botones */
+    background-color: white; /* Estado inicial blanco */
+    color: black;
+    border: 1px solid #ccc; /* Añadimos un borde delgado */
+    box-sizing: border-box; /* Asegura que el padding se incluya en el tamaño total del elemento */
+}
+
+.button-container .green {
+    background-color: green;
+    color: white;
+}
+
+.button-container .white {
+    background-color: white;
+    color: black;
+}
+
+/* Ajustes de espaciado entre filas */
+#data-table tr {
+    height: 1.5625rem; /* 25px equivalente a rem */
+}
+
+#data-table td, #data-table th {
+    padding: 0.125rem; /* Reducimos el padding de las celdas */
+    vertical-align: middle; /* Alinear verticalmente */
+    box-sizing: border-box; /* Asegura que el padding se incluya en el tamaño total del elemento */
+}
+
+/* Estilos para los botones con iconos */
+.ia-icon-btn {
+    background-image: url('/static/images/IA-icon.png'); /* Ruta relativa al nuevo icono */
+    background-size: cover; /* Aseguramos que la imagen cubra todo el botón */
+    background-position: center; /* Centramos la imagen */
+    background-color: transparent; /* Aseguramos que el fondo sea transparente */
+    width: 7.5rem; /* 120px de ancho */
+    height: 3.75rem; /* 60px de alto */
+    border: none; /* Eliminamos el borde para la imagen */
+    cursor: pointer;
+}
+
+.borrar-texto-btn {
+    background-image: url('/static/images/borrar-texto.png'); /* Ruta relativa al nuevo icono */
+    background-size: cover; /* Aseguramos que la imagen cubra todo el botón */
+    background-position: center; /* Centramos la imagen */
+    background-color: transparent; /* Aseguramos que el fondo sea transparente */
+    width: 7.5rem; /* 120px de ancho */
+    height: 3.0rem; /* 60px de alto */
+    border: none; /* Eliminamos el borde para la imagen */
+    cursor: pointer;
+    margin-top: 6.5rem; /* Añadimos un espacio superior de 20px */
+}
+
+#use-original-btn {
+    background-image: url('/static/images/texto-original.png'); /* Ruta relativa al nuevo icono */
+    background-size: cover; /* Aseguramos que la imagen cubra todo el botón */
+    background-position: center; /* Centramos la imagen */
+    background-color: transparent; /* Aseguramos que el fondo sea transparente */
+    width: 9.375rem; /* 150px de ancho */
+    height: 3.75rem; /* 60px de alto */
+    border: none; /* Eliminamos el borde para la imagen */
+    cursor: pointer;
+}
+
+#use-corrected-btn {
+    background-image: url('/static/images/texto-IA.png'); /* Ruta relativa al nuevo icono */
+    background-size: cover; /* Aseguramos que la imagen cubra todo el botón */
+    background-position: center; /* Centramos la imagen */
+    background-color: transparent; /* Aseguramos que el fondo sea transparente */
+    width: 9.375rem; /* 150px de ancho */
+    height: 3.75rem; /* 60px de alto */
+    border: none; /* Eliminamos el borde para la imagen */
+    cursor: pointer;
+}
+
+#add-row-btn {
+    background-image: url('/static/images/Add-row.png'); /* Ruta relativa a la imagen */
+    background-size: cover; /* Aseguramos que la imagen cubra todo el botón */
+    background-position: center; /* Centramos la imagen */
+    background-color: transparent; /* Aseguramos que el fondo sea transparente */
+    width: 2rem; /* 60px equivalente a rem */
+    height: 2rem; /* 60px equivalente a rem */
+    border: none; /* Eliminamos el borde para la imagen */
+    cursor: pointer;
+}
+
+/* Banner de la pagina */
+.header-image {
+    width: 80%; /* Ajustamos la imagen al 100% del contenedor */
+    height: auto; /* Mantener la proporción de la imagen */
+    /* max-width: 15rem; Ajustamos el ancho máximo según necesidad */
+    margin-bottom: 1.25rem; /* 20px equivalente a rem */
+}
+
+/* Clase para el tamaño de letra más pequeño */
+.small-header {
+    font-size: 0.875rem; /* Tamaño de letra más pequeño */
+}
+
+/* Clase para el tamaño de letra más pequeño en el conteo de archivos adjuntos */
+.attachment-count {
+    font-size: 0.75rem; /* Tamaño de letra más pequeño */
+    margin-left: 0rem; /* Reducimos el margen izquierdo para acercarlo al icono de carpeta */
+    text-align: left; /* Alinear el texto a la izquierda */
+    font-weight: bold; /* Hacer el texto en negritas */
+}
+
+/* Media queries para pantallas más pequeñas */
+@media (max-width: 1280px) {
+    body {
+        font-size: 14px; /* Ajustar el tamaño base de la fuente */
+    }
+
+    .container {
+        transform: scale(0.85); /* Escala al 85% */
+        width: 100%; /* Ajustar el ancho del contenedor */
+        max-width: none; /* Permitir que el contenedor ocupe todo el ancho disponible */
+    }
+
+    .left-section {
+        width: 65%; /* Mantener el ancho del contenedor izquierdo */
+    }
+
+    .right-section {
+        width: 35%; /* Mantener el ancho del contenedor derecho */
+    }
+
+    #send-messages-btn {
+        width: 3.5rem; /* Ajustar el tamaño del botón */
+        height: 3.5rem;
+    }
+
+    .folder-icon-btn, .clear-folder-btn {
+        width: 3rem; /* Ajustar el tamaño de los botones de la carpeta */
+        height: 3rem;
+    }
+
+    .delete-row-btn, .toggle-send-btn {
+        width: 0.875rem; /* Ajustar el tamaño de los botones de la fila */
+        height: 0.875rem;
+    }
+
+    .ia-icon-btn {
+        width: 6rem; /* Ajustar el tamaño del botón de IA */
+        height: 3rem;
+    }
+
+    .borrar-texto-btn {
+        width: 6rem; /* Ajustar el tamaño del botón de borrar texto */
+        height: 3rem;
+    }
+
+    #use-original-btn, #use-corrected-btn {
+        width: 8rem; /* Ajustar el tamaño de los botones */
+        height: 3rem;
+    }
+
+    #add-row-btn {
+        width: 1.5rem; /* Ajustar el tamaño del botón de agregar fila */
+        height: 1.5rem;
+    }
+
+    .header-image {
+        width: 70%; /* Ajustar el tamaño de la imagen de la cabecera */
+    }
+}

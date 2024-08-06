@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Sender</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="left-section">
+            <div class="header">
+                <img src="/static/Images/Titulo.png" alt="WhatsApp Sender" class="header-image">
+            </div>
+            <div class="input-section">
+                <table id="data-table">
+                    <tr>
+                        <th> </th>
+                        <th>Telefono</th>
+                        <th>Nombre</th>
+                        <th>Apellido</th>
+                        <th>Medio</th>
+                        <th>Acciones</th>
+                    </tr>
+                    <!-- Las filas se añadirán dinámicamente -->
+                </table>
+                <button id="add-row-btn" class="relative-add-row-btn"></button>
+            </div>
+        </div>
+        <div class="right-section">
+            <div class="upper-right">
+                <div class="send-section">
+                    <button id="send-messages-btn" class="send-btn"></button>
+                </div>
+            </div>
+            <div class="lower-right">
+                <div class="text-section">
+                    <button id="clear-text-btn" class="action-btn borrar-texto-btn"></button>
+                    <div class="text-box">
+                        <textarea id="input-text" placeholder="Escribe tu mensaje aquí..."></textarea>
+                        <div class="button-container">
+                            <button id="use-original-btn" class="toggle-btn white"></button>
+                        </div>
+                    </div>
+                    <div class="text-box">
+                        <textarea id="corrected-text" placeholder="Texto corregido aparecerá aquí..." readonly></textarea>
+                        <div class="button-container">
+                            <button id="use-corrected-btn" class="toggle-btn white"></button>
+                        </div>
+                    </div>
+                    <textarea id="final-text" placeholder="Texto final aquí..." readonly></textarea>
+                </div>
+                <div class="folder-section">
+                    <h3 class="small-header">Archivos Adjuntos</h3>
+                    <button id="folder-icon-btn" class="folder-icon-btn"></button>
+                    <input type="file" id="select-folder-btn" webkitdirectory directory multiple style="display: none;">
+                    <div id="attachment-count" class="attachment-count">0</div>
+                    <button id="clear-folder-btn" class="clear-folder-btn"></button>
+                </div>
+                <div id="message-status"></div>
+            </div>
+        </div>
+    </div>
+    <audio id="send-sound" src="/static/Sounds/sonido-envio.MP3"></audio>
+    <audio id="clear-sound" src="/static/Sounds/sonido-borrar.MP3"></audio>
+    <audio id="click-sound" src="/static/Sounds/sonido-click.MP3"></audio>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const addRowBtn = document.getElementById('add-row-btn');
+            const dataTable = document.getElementById('data-table');
+            const clearTextBtn = document.getElementById('clear-text-btn');
+            const inputText = document.getElementById('input-text');
+            const correctedText = document.getElementById('corrected-text');
+            const useOriginalBtn = document.getElementById('use-original-btn');
+            const useCorrectedBtn = document.getElementById('use-corrected-btn');
+            const finalText = document.getElementById('final-text');
+            const selectFolderBtn = document.getElementById('select-folder-btn');
+            const folderIconBtn = document.getElementById('folder-icon-btn');
+            const clearFolderBtn = document.getElementById('clear-folder-btn');
+            const sendMessagesBtn = document.getElementById('send-messages-btn');
+            const messageStatus = document.getElementById('message-status');
+            const attachmentCount = document.getElementById('attachment-count');
+            const sendSound = document.getElementById('send-sound');
+            const clearSound = document.getElementById('clear-sound');
+            const clickSound = document.getElementById('click-sound');
+
+            console.log("DOM fully loaded and parsed");
+
+            // Limpiar almacenamiento local relacionado con archivos adjuntos
+            localStorage.removeItem('folderSelected');
+            localStorage.removeItem('folderPath');
+
+            // Restablecer la interfaz de archivos adjuntos
+            attachmentCount.innerText = '0';
+            folderIconBtn.style.backgroundImage = "url('/static/Images/folder-icon.png')";
+
+            async function uploadFiles(files) {
+                const formData = new FormData();
+                Array.from(files).forEach(file => {
+                    formData.append('files', file);
+                });
+
+                const response = await fetch('/upload_files', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    return data.upload_path;
+                } else {
+                    throw new Error('Failed to upload files');
+                }
+            }
+
+            // Funciones de guardado y carga de datos
+            function saveContactsData() {
+                const rows = [];
+                const dataTableRows = dataTable.rows;
+                for (let i = 1; i < dataTableRows.length; i++) { // Skip header row
+                    const row = dataTableRows[i];
+                    const rowData = {
+                        phone: row.cells[1].querySelector('input').value,
+                        first_name: row.cells[2].querySelector('input').value,
+                        last_name: row.cells[3].querySelector('input').value,
+                        medium: row.cells[4].querySelector('input').value,
+                        send: row.cells[5].querySelector('.toggle-send-btn').classList.contains('green') ? 'green' : 'white'
+                    };
+                    rows.push(rowData);
+                }
+                fetch('/save_contacts', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ contacts: rows }),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'Contacts saved') {
+                        console.log('Contacts saved successfully');
+                    } else {
+                        console.error('Failed to save contacts');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error saving contacts:', error);
+                });
+            }
+
+            function loadContactsData() {
+                fetch('/load_contacts')
+                .then(response => response.json())
+                .then(data => {
+                    const savedRows = data.contacts || [];
+                    savedRows.forEach((rowData, index) => {
+                        const rowCount = dataTable.rows.length;
+                        const row = dataTable.insertRow();
+                        row.innerHTML = 
+                            `<td>${rowCount}</td>
+                            <td><input type="text" name="phone" value="${rowData.phone}"></td>
+                            <td><input type="text" name="first_name" value="${rowData.first_name}"></td>
+                            <td><input type="text" name="last_name" value="${rowData.last_name}"></td>
+                            <td><input type="text" name="medium" value="${rowData.medium}"></td>
+                            <td>
+                                <button class="delete-row-btn" style="background-color: red;"></button>
+                                <button class="toggle-send-btn ${rowData.send}"></button>
+                            </td>`;
+
+                        const deleteBtn = row.querySelector('.delete-row-btn');
+                        const toggleSendBtn = row.querySelector('.toggle-send-btn');
+
+                        deleteBtn.addEventListener('click', function() {
+                            row.remove();
+                            updateRowNumbers();
+                            saveContactsData();
+                        });
+
+                        toggleSendBtn.addEventListener('click', function() {
+                            if (toggleSendBtn.classList.contains('white')) {
+                                toggleSendBtn.classList.remove('white');
+                                toggleSendBtn.classList.add('green');
+                            } else {
+                                toggleSendBtn.classList.remove('green');
+                                toggleSendBtn.classList.add('white');
+                            }
+                            saveContactsData();
+                        });
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading contacts:', error);
+                });
+            }
+
+            addRowBtn.addEventListener('click', function() {
+                console.log("Add Row button clicked");
+                const rowCount = dataTable.rows.length;
+                const row = dataTable.insertRow();
+                row.innerHTML = 
+                    `<td>${rowCount}</td>
+                    <td><input type="text" name="phone"></td>
+                    <td><input type="text" name="first_name"></td>
+                    <td><input type="text" name="last_name"></td>
+                    <td><input type="text" name="medium"></td>
+                    <td>
+                        <button class="delete-row-btn" style="background-color: red;"></button>
+                        <button class="toggle-send-btn white"></button>
+                    </td>`;
+
+                const deleteBtn = row.querySelector('.delete-row-btn');
+                const toggleSendBtn = row.querySelector('.toggle-send-btn');
+
+                deleteBtn.addEventListener('click', function() {
+                    row.remove();
+                    updateRowNumbers();
+                    saveContactsData();
+                });
+
+                toggleSendBtn.addEventListener('click', function() {
+                    if (toggleSendBtn.classList.contains('white')) {
+                        toggleSendBtn.classList.remove('white');
+                        toggleSendBtn.classList.add('green');
+                    } else {
+                        toggleSendBtn.classList.remove('green');
+                        toggleSendBtn.classList.add('white');
+                    }
+                    saveContactsData();
+                });
+
+                saveContactsData();
+            });
+
+            function updateRowNumbers() {
+                const rows = dataTable.rows;
+                for (let i = 1; i < rows.length; i++) {
+                    rows[i].cells[0].innerText = i;
+                }
+            }
+
+            function correctText() {
+                const text = inputText.value;
+                fetch('/correct_text', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ text: text }),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.corrected_text) {
+                        correctedText.value = data.corrected_text;
+                        finalText.value = data.corrected_text; // Copiar el texto al cuadro de "Texto final"
+                    } else if (data.error) {
+                        alert(data.error);
+                    }
+                }).catch((error) => {
+                    console.error('Error in /correct_text request:', error);
+                });
+            }
+
+            clearTextBtn.addEventListener('click', function() {
+                console.log("Clear Text button clicked");
+                clearSound.play(); // Reproducir el sonido al hacer clic
+                clearTextBtn.classList.add('pressed'); // Añadir la clase 'pressed' para la animación
+                setTimeout(() => {
+                    clearTextBtn.classList.remove('pressed'); // Quitar la clase 'pressed' después de un corto periodo de tiempo
+                }, 200);
+
+                inputText.value = '';
+                correctedText.value = '';
+                finalText.value = '';
+                localStorage.removeItem('inputText');
+                localStorage.removeItem('correctedText');
+                localStorage.removeItem('finalText');
+            });
+
+            useOriginalBtn.addEventListener('click', function() {
+                console.log("Use Original button clicked");
+                clickSound.play(); // Reproducir el sonido al hacer clic
+                useOriginalBtn.classList.add('pressed'); // Añadir la clase 'pressed' para la animación
+                setTimeout(() => {
+                    useOriginalBtn.classList.remove('pressed'); // Quitar la clase 'pressed' después de un corto periodo de tiempo
+                }, 200);
+
+                finalText.value = inputText.value;
+                useOriginalBtn.classList.add('green');
+                useOriginalBtn.classList.remove('white');
+                useCorrectedBtn.classList.remove('green');
+                useCorrectedBtn.classList.add('white');
+                localStorage.setItem('finalText', inputText.value);
+            });
+
+            useCorrectedBtn.addEventListener('click', function() {
+                console.log("Use Corrected button clicked");
+                clickSound.play(); // Reproducir el sonido al hacer clic
+                useCorrectedBtn.classList.add('pressed'); // Añadir la clase 'pressed' para la animación
+                setTimeout(() => {
+                    useCorrectedBtn.classList.remove('pressed'); // Quitar la clase 'pressed' después de un corto periodo de tiempo
+                }, 200);
+
+                correctText(); // Llama a la función de corrección de texto y actualiza el final text
+                useCorrectedBtn.classList.add('green');
+                useCorrectedBtn.classList.remove('white');
+                useOriginalBtn.classList.remove('green');
+                useOriginalBtn.classList.add('white');
+                localStorage.setItem('finalText', correctedText.value);
+            });
+
+            folderIconBtn.addEventListener('click', function() {
+                console.log("Folder Icon button clicked");
+                clickSound.play(); // Reproducir el sonido al hacer clic
+                folderIconBtn.classList.add('pressed'); // Añadir la clase 'pressed' para la animación
+                setTimeout(() => {
+                    folderIconBtn.classList.remove('pressed'); // Quitar la clase 'pressed' después de un corto periodo de tiempo
+                }, 200);
+
+                selectFolderBtn.click();
+            });
+
+            selectFolderBtn.addEventListener('change', async function() {
+                if (selectFolderBtn.files.length > 0) {
+                    console.log("Folder selected");
+                    const files = Array.from(selectFolderBtn.files).filter(file => !file.name.startsWith('.') && file.size > 0);
+                    const count = files.length;
+                    attachmentCount.innerText = `${count}`; // Mostrar solo el número de archivos adjuntos
+                    
+                    try {
+                        const uploadPath = await uploadFiles(files); // Subir archivos al servidor y obtener la ruta temporal
+                        folderIconBtn.style.backgroundImage = "url('/static/Images/folder-uploaded-icon.png')";
+                        localStorage.setItem('folderSelected', 'true');
+                        localStorage.setItem('folderPath', uploadPath); // Guardar la ruta temporal en el servidor
+                    } catch (error) {
+                        console.error('Error al subir los archivos:', error);
+                    }
+                }
+            });
+
+            clearFolderBtn.addEventListener('click', function() {
+                console.log("Clear Folder button clicked");
+                clearSound.play(); // Reproducir el sonido al hacer clic
+                clearFolderBtn.classList.add('pressed'); // Añadir la clase 'pressed' para la animación
+                setTimeout(() => {
+                    clearFolderBtn.classList.remove('pressed'); // Quitar la clase 'pressed' después de un corto periodo de tiempo
+                }, 200);
+
+                selectFolderBtn.value = '';
+                folderIconBtn.style.backgroundImage = "url('/static/Images/folder-icon.png')";
+                attachmentCount.innerText = '0'; // Resetear el contador
+                localStorage.removeItem('folderSelected');
+                localStorage.removeItem('folderPath'); // Remover la ruta de la carpeta
+            });
+
+            sendMessagesBtn.addEventListener('click', function() {
+                console.log("Send Messages button clicked");
+                sendSound.play(); // Reproducir el sonido al hacer clic
+                sendMessagesBtn.classList.add('pressed'); // Añadir la clase 'pressed' para la animación
+
+                setTimeout(() => {
+                    sendMessagesBtn.classList.remove('pressed'); // Quitar la clase 'pressed' después de un corto periodo de tiempo
+                }, 200);
+
+                const recipients = [];
+                const dataTableRows = dataTable.rows;
+                for (let i = 1; i < dataTableRows.length; i++) { // Skip header row
+                    const row = dataTableRows[i];
+                    if (row.cells[5].querySelector('.toggle-send-btn').classList.contains('green')) {
+                        recipients.push({
+                            phone: row.cells[1].querySelector('input').value,
+                            first_name: row.cells[2].querySelector('input').value,
+                            last_name: row.cells[3].querySelector('input').value,
+                            medium: row.cells[4].querySelector('input').value
+                        });
+                    }
+                }
+                const finalTextValue = finalText.value;
+                const folderPath = localStorage.getItem('folderPath'); // Obtener la ruta de la carpeta desde localStorage
+
+                let totalMessages = recipients.length;
+                let sentCount = 0;
+
+                function sendNextMessage(index) {
+                    if (index >= recipients.length) {
+                        fetch('/close_browser', { method: 'POST' });  // Cerrar el navegador al final
+                        return;
+                    }
+
+                    const recipient = recipients[index];
+
+                    fetch('/send_messages', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            final_text: finalTextValue,
+                            recipients: [recipient],
+                            folder_path: folderPath
+                        }),
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'Messages sent') {
+                            sentCount++;
+                            messageStatus.innerText = `Enviado(s) ${sentCount} mensaje(s) de ${totalMessages}`;
+                        } else {
+                            alert(data.error);
+                        }
+                        sendNextMessage(index + 1); // Llamar a la función para enviar el siguiente mensaje
+                    })
+                    .catch(error => {
+                        console.error('Error al enviar el mensaje:', error);
+                        sendNextMessage(index + 1); // Intentar enviar el siguiente mensaje incluso si hay un error
+                    });
+                }
+
+                sendNextMessage(0); // Comenzar con el primer mensaje
+            });
+
+            function loadTextData() {
+                const savedInputText = localStorage.getItem('inputText');
+                const savedCorrectedText = localStorage.getItem('correctedText');
+                const savedFinalText = localStorage.getItem('finalText');
+                const folderSelected = localStorage.getItem('folderSelected');
+                const savedFolderPath = localStorage.getItem('folderPath'); // Nueva referencia
+
+                if (savedInputText) {
+                    inputText.value = savedInputText;
+                }
+                if (savedCorrectedText) {
+                    correctedText.value = savedCorrectedText;
+                }
+                if (savedFinalText) {
+                    finalText.value = savedFinalText;
+                }
+                if (folderSelected) {
+                    folderIconBtn.style.backgroundImage = "url('/static/Images/folder-uploaded-icon.png')";
+                }
+            }
+
+            inputText.addEventListener('input', function() {
+                localStorage.setItem('inputText', inputText.value);
+            });
+
+            correctedText.addEventListener('input', function() {
+                localStorage.setItem('correctedText', correctedText.value);
+            });
+
+            finalText.addEventListener('input', function() {
+                localStorage.setItem('finalText', finalText.value);
+            });
+
+            loadContactsData();  // Cargar los datos de contactos al iniciar la página
+            loadTextData();  // Cargar los datos de texto al iniciar la página
+        });
+    </script>
+    <script src="/static/renderer.js"></script>
+</body>
+</html>
