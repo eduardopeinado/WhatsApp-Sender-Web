@@ -2,25 +2,45 @@ import os
 import openai
 import time
 import json
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 from browser import get_driver, close_driver
 from messenger import send_message, replace_placeholders
 from file_handler import get_all_files
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import padding
-import base64
-import hashlib
+from flask_sqlalchemy import SQLAlchemy
+from flask_bcrypt import Bcrypt
 import logging
 import shutil
+from sqlalchemy.exc import IntegrityError
 
 logging.basicConfig(level=logging.INFO)
 
 load_dotenv()
 
-app = Flask(__name__, template_folder="../app/templates", static_folder="../app/static")
+# Define la raíz del proyecto usando el directorio de trabajo actual
+PROJECT_ROOT = os.getcwd()
+TEMPLATES_FOLDER = os.path.join(PROJECT_ROOT, 'app', 'templates')
+STATIC_FOLDER = os.path.join(PROJECT_ROOT, 'app', 'static')
+
+# Imprimir las rutas para verificar
+print(f"Project Root: {PROJECT_ROOT}")
+print(f"Templates Folder: {TEMPLATES_FOLDER}")
+print(f"Static Folder: {STATIC_FOLDER}")
+
+app = Flask(__name__, template_folder=TEMPLATES_FOLDER, static_folder=STATIC_FOLDER)
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(PROJECT_ROOT, "backend/instance/site.db")}'
+app.config['SECRET_KEY'] = 'supersecretkey'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Asegurarse de que el directorio de la base de datos exista
+db_path = os.path.join(PROJECT_ROOT, 'backend/instance/site.db')
+db_dir = os.path.dirname(db_path)
+if not os.path.exists(db_dir):
+    os.makedirs(db_dir)
+
+db = SQLAlchemy(app)
+bcrypt = Bcrypt(app)
 
 USER_HOME = os.path.expanduser("~")
 UPLOAD_FOLDER = os.path.join(USER_HOME, 'whatsapp_attachments')
@@ -34,85 +54,87 @@ openai.api_key = api_key
 
 browser = None
 
-# Ruta para el archivo de autorización
-AUTH_FILE_PATH = os.path.join(USER_HOME, '.whatsapp_sender_auth')
-AUTH_KEY = 'Epeinado0977'
-ENCRYPTION_KEY = hashlib.sha256('0123456789abcdef'.encode()).digest()
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(20), unique=True, nullable=False)
+    password = db.Column(db.String(60), nullable=False)
+    temp_password = db.Column(db.String(60), nullable=True)
 
-CONTACTS_FILE = os.path.join(USER_HOME, 'contacts.json')
+class Contact(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    phone = db.Column(db.String(15), nullable=False)
+    first_name = db.Column(db.String(30), nullable=False)
+    last_name = db.Column(db.String(30), nullable=False)
+    medium = db.Column(db.String(30), nullable=False)
+    send = db.Column(db.String(10), nullable=False)
 
-def encrypt(text):
-    iv = os.urandom(16)
-    cipher = Cipher(algorithms.AES(ENCRYPTION_KEY), modes.CBC(iv), backend=default_backend())
-    encryptor = cipher.encryptor()
-    
-    padder = padding.PKCS7(128).padder()
-    padded_data = padder.update(text.encode()) + padder.finalize()
-    
-    encrypted = encryptor.update(padded_data) + encryptor.finalize()
-    return base64.b64encode(iv + encrypted).decode('utf-8')
-
-def decrypt(encrypted_text):
-    encrypted_data = base64.b64decode(encrypted_text)
-    iv = encrypted_data[:16]
-    cipher = Cipher(algorithms.AES(ENCRYPTION_KEY), modes.CBC(iv), backend=default_backend())
-    decryptor = cipher.decryptor()
-    
-    padded_data = decryptor.update(encrypted_data[16:]) + decryptor.finalize()
-    
-    unpadder = padding.PKCS7(128).unpadder()
-    data = unpadder.update(padded_data) + unpadder.finalize()
-    return data.decode('utf-8')
-
-def generate_auth_file():
-    encrypted_data = encrypt(AUTH_KEY)
-    with open(AUTH_FILE_PATH, 'w') as auth_file:
-        auth_file.write(encrypted_data)
-
-def check_auth_file():
-    if not os.path.exists(AUTH_FILE_PATH):
-        return False
-    with open(AUTH_FILE_PATH, 'r') as auth_file:
-        stored_data = auth_file.read()
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form['username'].lower()
+        temp_password = request.form['temp_password']
+        hashed_temp_password = bcrypt.generate_password_hash(temp_password).decode('utf-8')
+        user = User(username=username, password=hashed_temp_password, temp_password=hashed_temp_password)
+        db.session.add(user)
         try:
-            decrypted_data = decrypt(stored_data)
-            return decrypted_data == AUTH_KEY
-        except Exception as e:
-            print(f"Error during decryption or verification: {e}")
-            return False
+            db.session.commit()
+            flash('User registered successfully!', 'success')
+        except IntegrityError:
+            db.session.rollback()
+            flash('Username already exists. Please choose a different username.', 'danger')
+            return redirect(url_for('register'))
+        return redirect(url_for('login'))
+    return render_template('register.html')
 
-def load_contacts():
-    if os.path.exists(CONTACTS_FILE):
-        with open(CONTACTS_FILE, 'r') as f:
-            return json.load(f)
-    return []
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username'].lower()
+        password = request.form['password']
+        user = User.query.filter_by(username=username).first()
+        if user:
+            if user.temp_password and bcrypt.check_password_hash(user.temp_password, password):
+                session['user_id'] = user.id
+                return redirect(url_for('change_password'))
+            elif bcrypt.check_password_hash(user.password, password):
+                session['user_id'] = user.id
+                return redirect(url_for('index'))
+        flash('Login Unsuccessful. Please check username and password', 'danger')
+    return render_template('login.html')
 
-def save_contacts(contacts):
-    with open(CONTACTS_FILE, 'w') as f:
-        json.dump(contacts, f)
+@app.route('/change_password', methods=['GET', 'POST'])
+def change_password():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    if request.method == 'POST':
+        new_password = request.form['new_password']
+        confirm_password = request.form['confirm_password']
+        
+        if new_password == confirm_password:
+            hashed_password = bcrypt.generate_password_hash(new_password).decode('utf-8')
+            user = User.query.get(session['user_id'])
+            user.password = hashed_password
+            user.temp_password = None
+            db.session.commit()
+            flash('Your password has been updated!', 'success')
+            return redirect(url_for('index'))
+        else:
+            flash('Passwords do not match. Please try again.', 'danger')
+    
+    return render_template('change_password.html')
+
+@app.route('/logout')
+def logout():
+    session.pop('user_id', None)
+    return redirect(url_for('login'))
 
 @app.route('/')
 def index():
-    if not check_auth_file():
-        return redirect(url_for('auth'))
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
     return render_template('index.html')
-
-@app.route('/auth', methods=['GET', 'POST'])
-def auth():
-    if request.method == 'POST':
-        key = request.form.get('authKey')
-        if key == AUTH_KEY:
-            generate_auth_file()
-            return redirect(url_for('index'))
-        else:
-            return "Clave de instalación incorrecta", 401
-    return '''
-        <form method="post">
-            <label for="authKey">Ingrese la clave de instalación</label>
-            <input id="authKey" name="authKey" type="password" />
-            <button type="submit">Enviar</button>
-        </form>
-    '''
 
 @app.route('/correct_text', methods=['POST'])
 def correct_text():
@@ -169,9 +191,6 @@ def send_messages_route():
         return jsonify({'status': 'Messages sent'})
     except Exception as e:
         return jsonify({'error': str(e)})
-    # No cerramos el navegador aquí
-    # finally:
-    #     close_driver()  # No cerramos el navegador en el bloque finally
 
 @app.route('/close_browser', methods=['POST'])
 def close_browser():
@@ -202,19 +221,50 @@ def upload_files():
 
 @app.route('/save_contacts', methods=['POST'])
 def save_contacts_route():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    user_id = session['user_id']
     contacts = request.json.get('contacts', [])
-    save_contacts(contacts)
+
+    # Borrar contactos existentes del usuario
+    Contact.query.filter_by(user_id=user_id).delete()
+
+    # Guardar nuevos contactos
+    for contact in contacts:
+        new_contact = Contact(
+            user_id=user_id,
+            phone=contact['phone'],
+            first_name=contact['first_name'],
+            last_name=contact['last_name'],
+            medium=contact['medium'],
+            send=contact['send']
+        )
+        db.session.add(new_contact)
+    db.session.commit()
+
     return jsonify({'status': 'Contacts saved'})
 
 @app.route('/load_contacts', methods=['GET'])
 def load_contacts_route():
-    contacts = load_contacts()
-    return jsonify({'contacts': contacts})
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    user_id = session['user_id']
+    contacts = Contact.query.filter_by(user_id=user_id).all()
+    contacts_data = [
+        {
+            'phone': contact.phone,
+            'first_name': contact.first_name,
+            'last_name': contact.last_name,
+            'medium': contact.medium,
+            'send': contact.send
+        } for contact in contacts
+    ]
+
+    return jsonify({'contacts': contacts_data})
 
 if __name__ == '__main__':
-    # Crear el archivo contacts.json si no existe
-    if not os.path.exists(CONTACTS_FILE):
-        with open(CONTACTS_FILE, 'w') as f:
-            json.dump([], f)
-    
+    with app.app_context():
+        db.create_all()
     app.run(debug=True, port=3000)
